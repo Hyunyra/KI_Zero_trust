@@ -48,7 +48,11 @@ app.get('/nilai', requireRole('mahasiswa', 'dosen'), (req, res) => {
      FROM nilai n JOIN kelas k ON k.id = n.kelas_id LEFT JOIN users u ON u.nim = n.mahasiswa_nim
      WHERE ${where.join(' AND ')} ORDER BY n.kelas_id, n.mahasiswa_nim`
   ).all(...args);
-  res.json({ data: rows.map((r) => ({ ...r, final: !!r.final })) });
+  // Mahasiswa hanya boleh melihat nilai yang SUDAH final; nilai draft disembunyikan di sumber data
+  const isMhs = req.auth.role === 'mahasiswa';
+  res.json({
+    data: rows.map((r) => ({ ...r, nilai: isMhs && !r.final ? null : r.nilai, final: !!r.final })),
+  });
 });
 
 // ---------- PUT /nilai/:id ----------

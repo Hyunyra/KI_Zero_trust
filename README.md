@@ -54,7 +54,7 @@ Hanya gateway (`http://127.0.0.1:3000`) yang dipakai klien. Perintah lain:
 ```bash
 npm run reset      # hapus database & seed ulang (hentikan server dulu)
 npm run audit      # lihat audit log   (npm run audit -- deny  → hanya yang ditolak)
-npm test           # uji otomatis 56 skenario (jalankan setelah `npm run reset` + `npm start`)
+npm test           # uji otomatis 58 skenario (jalankan setelah `npm run reset` + `npm start`)
 ```
 
 > Windows (Laragon/XAMPP): cukup Node.js 18+. SQLite tidak butuh server database.
@@ -160,6 +160,7 @@ Untuk mendemokan penolakan, ubah rentang sehingga jam sekarang berada di luar re
 - **Token terikat device** — refresh token menyimpan device saat login; jika `X-Device-ID` dikirim saat refresh/logout, harus cocok.
 - **Anti-manipulasi path** — gateway memakai allowlist karakter path (menolak `../`, `//`, `%2e`), sehingga yang diperiksa policy sama dengan yang diteruskan.
 - **Anti-enumerasi** — pesan login gagal seragam dan waktu respons disamakan (hash dummy).
+- **Nilai draft disembunyikan** — mahasiswa hanya melihat nilai setelah kelas difinalisasi (sebelum itu `nilai: null`, disaring di Service Nilai). Dosen tetap melihat semua.
 - **Finalisasi konsisten** — bila sinkron transkrip gagal, status final dibatalkan (rollback).
 
 ## Catatan & batasan
@@ -176,7 +177,7 @@ config/access-hours.json      jam akses (dapat diubah saat demo)
 scripts/setup.js              keypair + skema DB + seed
 scripts/start-all.js          menjalankan 3 komponen sekaligus
 scripts/audit.js              menampilkan audit log
-scripts/test-e2e.js           56 skenario uji otomatis
+scripts/test-e2e.js           58 skenario uji otomatis
 src/shared/                   config, db, verifikasi JWT, guard service
 src/gateway/                  PEP: index, policy (PE), authRoutes (PA), tokens, audit, accessHours
 src/nilai/                    Service Nilai

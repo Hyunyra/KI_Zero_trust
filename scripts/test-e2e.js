@@ -92,6 +92,7 @@ async function login(user, password = 'password123', device = DEV[user]) {
   section('4. Kebijakan akses (Tabel 3)');
   r = await gw('GET', '/nilai', { token: tok.mhs1, device: DEV.mhs1 });
   check('mahasiswa hanya melihat nilai sendiri', r.status === 200 && r.json.data.length === 2 && r.json.data.every((x) => x.nim === '2210001'), JSON.stringify(r));
+  check('nilai yang belum final disembunyikan dari mahasiswa (nilai = null)', r.json.data.every((x) => x.nilai === null && x.final === false), JSON.stringify(r.json));
   r = await gw('GET', '/nilai?nim=2210002', { token: tok.mhs1, device: DEV.mhs1 });
   check('mahasiswa minta nilai NIM lain -> 403', r.status === 403);
   r = await gw('GET', '/nilai', { token: tok.dosen1, device: DEV.dosen1 });
@@ -146,6 +147,8 @@ async function login(user, password = 'password123', device = DEV[user]) {
   section('7. Transkrip');
   r = await gw('GET', '/transkrip/2210001', { token: tok.mhs1, device: DEV.mhs1 });
   check('transkrip mhs1 memuat hasil sinkron kelas 1', r.status === 200 && r.json.mata_kuliah.length === 1 && r.json.mata_kuliah[0].mata_kuliah === 'Keamanan Informasi', JSON.stringify(r));
+  r = await gw('GET', '/nilai', { token: tok.mhs1, device: DEV.mhs1 });
+  check('setelah finalisasi, nilai kelas 1 terlihat; kelas 2 tetap tersembunyi', r.json.data.find((x) => x.kelas_id === 1).nilai === 88 && r.json.data.find((x) => x.kelas_id === 2).nilai === null, JSON.stringify(r.json));
   r = await gw('GET', '/transkrip/2210002', { token: tok.mhs1, device: DEV.mhs1 });
   check('mahasiswa melihat transkrip NIM lain -> 403', r.status === 403);
   r = await gw('GET', '/transkrip/2210002', { token: tok.admin, device: DEV.admin });

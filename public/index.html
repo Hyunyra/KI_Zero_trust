@@ -99,7 +99,7 @@ async function loadNilai(){
   if(r.status!==200){$('nilai').innerHTML=`<span style="color:var(--no)">${esc(r.json?.message||'gagal')}</span>`;return}
   const dosen=S.role==='dosen',rows=r.json.data;
   $('nilai').innerHTML=`<table><tr><th>ID</th><th>Kelas</th><th>Mahasiswa</th><th>Nilai</th><th></th></tr>${rows.map(x=>`<tr><td>${x.id}</td><td>${esc(x.kelas)}</td><td>${esc(x.mahasiswa)} <span class="mu">${esc(x.nim)}</span></td>
-   <td>${dosen&&!x.final?`<input type="number" min="0" max="100" value="${x.nilai??''}" id="n${x.id}">`:esc(x.nilai)}</td>
+   <td>${dosen&&!x.final?`<input type="number" min="0" max="100" value="${x.nilai??''}" id="n${x.id}">`:(x.nilai===null?'<span class="mu">Belum final</span>':esc(x.nilai))}</td>
    <td>${x.final?'<span class="fin">FINAL</span>':dosen?`<button data-id="${x.id}">Simpan</button>`:''}</td></tr>`).join('')}</table>`;
   $('nilai').querySelectorAll('button[data-id]').forEach(b=>b.onclick=async()=>{
     const id=b.dataset.id;await api('PUT','/nilai/'+id,{body:{nilai:Number($('n'+id).value)}});loadNilai()});
