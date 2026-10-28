@@ -1,0 +1,51 @@
+# Jalankan: docker compose up --build        (hanya gateway yang membuka port ke host)
+# Reset data: docker compose down -v && rm -rf keys && docker compose up --build
+x-secrets: &secrets
+  GATEWAY_SECRET: ${GATEWAY_SECRET:-dev-gateway-secret-ganti-di-produksi}
+  SERVICE_CLIENT_SECRET: ${SERVICE_CLIENT_SECRET:-dev-service-nilai-secret}
+
+services:
+  setup:            # sekali jalan: membuat keypair + database + seed
+    build: .
+    command: node scripts/setup.js
+    environment: *secrets
+    volumes:
+      - data:/app/data
+      - ./keys:/app/keys
+
+  gateway:          # PEP - satu-satunya yang dipublikasikan ke host
+    build: .
+    command: node src/gateway/index.js
+    depends_on: { setup: { condition: service_completed_successfully } }
+    ports: ["3000:3000"]
+    environment:
+      <<: *secrets
+      NILAI_URL: http://nilai:3001
+      TRANSKRIP_URL: http://transkrip:3002
+    volumes:
+      - data:/app/data
+      - ./keys/gateway:/app/keys/gateway:ro   # hanya gateway memegang private key
+      - ./keys/public:/app/keys/public:ro
+      - ./config:/app/config:ro               # ubah config/access-hours.json saat demo
+
+  nilai:            # tanpa `ports`: tidak dapat diakses dari luar jaringan compose
+    build: .
+    command: node src/nilai/index.js
+    depends_on: { setup: { condition: service_completed_successfully } }
+    environment:
+      <<: *secrets
+      GATEWAY_URL: http://gateway:3000
+    volumes:
+      - data:/app/data
+      - ./keys/public:/app/keys/public:ro     # service hanya memegang public key
+
+  transkrip:
+    build: .
+    command: node src/transkrip/index.js
+    depends_on: { setup: { condition: service_completed_successfully } }
+    environment: *secrets
+    volumes:
+      - data:/app/data
+      - ./keys/public:/app/keys/public:ro
+volumes:
+  data:

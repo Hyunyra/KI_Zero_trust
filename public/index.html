@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sistem Nilai · Zero Trust</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--tx:#1d2330;--mu:#6b7385;--bd:#dde1e8;--pr:#2457d6;--ok:#16794a;--no:#b3261e;--code:#0f1521;--codetx:#d6e2ff}
+@media(prefers-color-scheme:dark){:root{--bg:#10141c;--card:#181e29;--tx:#e6e9f0;--mu:#97a0b3;--bd:#2a3242;--pr:#6c93ff;--ok:#4cc38a;--no:#ff7b72}}
+*{box-sizing:border-box}body{margin:0;font:14px/1.5 system-ui,sans-serif;background:var(--bg);color:var(--tx)}
+header{padding:12px 20px;border-bottom:1px solid var(--bd);background:var(--card);display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+header h1{font-size:16px;margin:0;flex:1}.badge{padding:2px 10px;border-radius:99px;background:var(--bd);font-size:12px}
+main{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;padding:16px 20px;max-width:1300px;margin:auto}
+@media(max-width:900px){main{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:14px;margin-bottom:16px}
+.card h2{font-size:14px;margin:0 0 10px}
+input,select,button{font:inherit;padding:6px 10px;border:1px solid var(--bd);border-radius:6px;background:var(--card);color:var(--tx)}
+button{cursor:pointer}button.p{background:var(--pr);color:#fff;border-color:var(--pr)}button:disabled{opacity:.45;cursor:not-allowed}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;align-items:center}.row input{flex:1;min-width:110px}
+.chips button{font-size:12px;padding:3px 9px}label{font-size:12px;color:var(--mu)}
+table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:5px 6px;border-bottom:1px solid var(--bd)}th{font-size:12px;color:var(--mu)}
+td input{width:70px;flex:none;padding:3px 6px}.fin{color:var(--ok);font-weight:600}.mu{color:var(--mu)}
+#log{background:var(--code);color:var(--codetx);border-radius:8px;padding:10px;height:520px;overflow:auto;font:12px/1.45 ui-monospace,monospace;white-space:pre-wrap;word-break:break-all}
+.s2{color:#4cc38a}.s4{color:#ff7b72}.req{color:#9db4ff}
+</style>
+</head>
+<body>
+<header><h1>Sistem Nilai · Zero Trust <span class="mu">(klien uji lewat API Gateway)</span></h1>
+  <span id="who" class="badge">belum login</span><button id="bLogout" disabled>Logout</button></header>
+<main>
+<div>
+  <section class="card"><h2>1. Login</h2>
+    <div class="row chips" id="chips"></div>
+    <div class="row"><input id="user" placeholder="username"><input id="pass" type="password" placeholder="password"></div>
+    <div class="row"><label for="dev">X-Device-ID</label><input id="dev" placeholder="device id"></div>
+    <div class="row"><button class="p" id="bLogin">Login</button><button id="bRefresh" disabled>Refresh token</button>
+      <span class="mu" id="exp"></span></div>
+    <div class="mu">Ubah Device ID ke milik user lain untuk menguji penolakan device.</div>
+  </section>
+  <section class="card"><h2>2. Nilai</h2>
+    <div class="row"><button id="bNilai" disabled>Muat nilai</button><span id="fins"></span></div>
+    <div id="nilai" class="mu">Login untuk melihat nilai.</div>
+  </section>
+  <section class="card"><h2>3. Transkrip</h2>
+    <div class="row"><input id="nim" placeholder="NIM, mis. 2210001"><button id="bTr" disabled>Lihat transkrip</button></div>
+    <div id="tr" class="mu"></div>
+  </section>
+  <section class="card"><h2>4. Uji penolakan (harus 401/403)</h2>
+    <div class="row" id="atk"></div>
+    <div class="mu">Tombol memakai sesi yang sedang login. Hasil dan alasan tampil di log kanan; detail ada di <code>npm run audit</code>.</div>
+  </section>
+</div>
+<div><section class="card"><h2>Log request / response <button id="bClear" style="float:right;padding:2px 8px">bersihkan</button></h2><div id="log"></div></section></div>
+</main>
+<script>
+const ACC={admin:['DEV-ADMIN-01',''],dosen1:['DEV-DOSEN1-01',''],dosen2:['DEV-DOSEN2-01',''],mhs1:['DEV-MHS1-01','2210001'],mhs2:['DEV-MHS2-01','2210002'],mhs3:['DEV-MHS3-01','2210003']};
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let S={access:null,refresh:null,role:null,user:null,exp:0}; // token hanya di memori (hilang saat reload)
+
+for(const u of Object.keys(ACC)){const b=document.createElement('button');b.textContent=u;b.onclick=()=>{$('user').value=u;$('pass').value='password123';$('dev').value=ACC[u][0]};$('chips').append(b)}
+
+function log(html){const l=$('log');l.insertAdjacentHTML('beforeend',html+'\n');l.scrollTop=l.scrollHeight}
+async function api(method,path,{body,auth=true,device=true,token}={}){
+  const h={};const t=token??(auth?S.access:null);
+  if(t)h.Authorization='Bearer '+t;
+  if(device&&$('dev').value)h['X-Device-ID']=$('dev').value;
+  if(body!==undefined)h['Content-Type']='application/json';
+  log(`<span class="req">▶ ${method} ${esc(path)}</span>  device=${esc(h['X-Device-ID']||'-')} ${t?'[Bearer]':'[tanpa token]'}${body?' '+esc(JSON.stringify(body,(k,v)=>/token/.test(k)?'…':v)):''}`);
+  let r,j;try{r=await fetch(path,{method,headers:h,body:body!==undefined?JSON.stringify(body):undefined});j=await r.json().catch(()=>null)}catch(e){log(`<span class="s4">✘ gagal terhubung: ${esc(e.message)}</span>`);return{status:0}}
+  const cls=r.status<400?'s2':'s4';
+  const shown=j&&j.access_token?{...j,access_token:j.access_token.slice(0,24)+'…',refresh_token:j.refresh_token?j.refresh_token.slice(0,10)+'…':undefined}:j;
+  log(`<span class="${cls}">◀ ${r.status}</span> ${esc(JSON.stringify(shown))}\n`);
+  return{status:r.status,json:j};
+}
+function decode(t){try{return JSON.parse(atob(t.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')))}catch{return{}}}
+function setSession(j,keepRefresh){
+  S.access=j.access_token;if(j.refresh_token||!keepRefresh)S.refresh=j.refresh_token||S.refresh;
+  const c=decode(S.access);S.role=c.role;S.exp=c.exp*1000;
+  $('who').textContent=`${S.user} · ${S.role}`;
+  for(const id of['bLogout','bRefresh','bNilai','bTr'])$(id).disabled=false;
+  $('bTr').disabled=!(S.role==='mahasiswa'||S.role==='admin');$('bNilai').disabled=!(S.role==='mahasiswa'||S.role==='dosen');
+  if(S.role==='mahasiswa'&&!$('nim').value)$('nim').value=ACC[S.user]?.[1]||'';
+}
+function clearSession(){S={access:null,refresh:null,role:null,user:null,exp:0};$('who').textContent='belum login';$('exp').textContent='';
+  for(const id of['bLogout','bRefresh','bNilai','bTr'])$(id).disabled=true;$('nilai').textContent='Login untuk melihat nilai.';$('tr').textContent='';$('fins').textContent=''}
+setInterval(()=>{if(S.access){const s=Math.round((S.exp-Date.now())/1000);$('exp').textContent=s>0?`access token habis dalam ${Math.floor(s/60)}m ${s%60}s`:'access token kedaluwarsa → klik Refresh token'}},1000);
+
+$('bLogin').onclick=async()=>{
+  const r=await api('POST','/auth/login',{body:{username:$('user').value,password:$('pass').value},auth:false});
+  if(r.status===200){S.user=$('user').value;setSession(r.json)}
+};
+$('bRefresh').onclick=async()=>{const r=await api('POST','/auth/refresh',{body:{refresh_token:S.refresh},auth:false});if(r.status===200)setSession(r.json,true)};
+$('bLogout').onclick=async()=>{await api('POST','/auth/logout',{body:{refresh_token:S.refresh},auth:false});clearSession()};
+$('bClear').onclick=()=>{$('log').innerHTML=''};
+
+async function loadNilai(){
+  const r=await api('GET','/nilai');
+  if(r.status!==200){$('nilai').innerHTML=`<span style="color:var(--no)">${esc(r.json?.message||'gagal')}</span>`;return}
+  const dosen=S.role==='dosen',rows=r.json.data;
+  $('nilai').innerHTML=`<table><tr><th>ID</th><th>Kelas</th><th>Mahasiswa</th><th>Nilai</th><th></th></tr>${rows.map(x=>`<tr><td>${x.id}</td><td>${esc(x.kelas)}</td><td>${esc(x.mahasiswa)} <span class="mu">${esc(x.nim)}</span></td>
+   <td>${dosen&&!x.final?`<input type="number" min="0" max="100" value="${x.nilai??''}" id="n${x.id}">`:esc(x.nilai)}</td>
+   <td>${x.final?'<span class="fin">FINAL</span>':dosen?`<button data-id="${x.id}">Simpan</button>`:''}</td></tr>`).join('')}</table>`;
+  $('nilai').querySelectorAll('button[data-id]').forEach(b=>b.onclick=async()=>{
+    const id=b.dataset.id;await api('PUT','/nilai/'+id,{body:{nilai:Number($('n'+id).value)}});loadNilai()});
+  const ks=[...new Map(rows.map(x=>[x.kelas_id,x])).values()];
+  $('fins').innerHTML='';
+  if(dosen)for(const k of ks){if(rows.filter(x=>x.kelas_id===k.kelas_id).every(x=>x.final))continue;
+    const b=document.createElement('button');b.className='p';b.textContent='Finalisasi: '+k.kelas;
+    b.onclick=async()=>{await api('POST',`/kelas/${k.kelas_id}/finalisasi`);loadNilai()};$('fins').append(b)}
+}
+$('bNilai').onclick=loadNilai;
+
+$('bTr').onclick=async()=>{
+  const r=await api('GET','/transkrip/'+encodeURIComponent($('nim').value));
+  if(r.status!==200){$('tr').innerHTML=`<span style="color:var(--no)">${esc(r.json?.message||'gagal')}</span>`;return}
+  const t=r.json;$('tr').innerHTML=`<b>${esc(t.nama)}</b> <span class="mu">${esc(t.nim)}</span>
+   <table><tr><th>Mata kuliah</th><th>Nilai</th><th>Huruf</th></tr>${t.mata_kuliah.map(m=>`<tr><td>${esc(m.mata_kuliah)}</td><td>${m.nilai}</td><td>${m.huruf}</td></tr>`).join('')||'<tr><td colspan=3 class="mu">Belum ada nilai tersinkron</td></tr>'}</table>
+   <div class="mu">Rata-rata: ${t.rata_rata??'-'}</div>`;
+};
+
+const ATK=[
+ ['Tanpa token → /nilai',()=>api('GET','/nilai',{auth:false})],
+ ['Nilai NIM lain',()=>api('GET','/nilai?nim=2210002')],
+ ['Kelas dosen lain',()=>api('GET','/nilai?kelas_id=2')],
+ ['Transkrip NIM lain',()=>api('GET','/transkrip/2210002')],
+ ['PUT nilai 1 → 100',()=>api('PUT','/nilai/1',{body:{nilai:100}})],
+ ['Finalisasi kelas 2',()=>api('POST','/kelas/2/finalisasi')],
+ ['Sinkron pakai token user',()=>api('POST','/transkrip/sinkron',{body:{kelas_id:1,nama_kelas:'X',items:[{nim:'2210001',nilai:100}]}})],
+ ['Tanpa Device-ID',()=>api('GET','/nilai',{device:false})],
+ ['Token palsu',()=>api('GET','/nilai',{token:S.access?S.access.slice(0,-4)+'AAAA':'x.y.z'})],
+ ['Endpoint tak dikenal',()=>api('GET','/admin/rahasia')]];
+for(const [n,f] of ATK){const b=document.createElement('button');b.textContent=n;b.onclick=f;$('atk').append(b)}
+</script>
+</body>
+</html>
