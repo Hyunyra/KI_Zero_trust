@@ -54,7 +54,7 @@ Hanya gateway (`http://127.0.0.1:3000`) yang dipakai klien. Perintah lain:
 ```bash
 npm run reset      # hapus database & seed ulang (hentikan server dulu)
 npm run audit      # lihat audit log   (npm run audit -- deny  → hanya yang ditolak)
-npm test           # uji otomatis 58 skenario (jalankan setelah `npm run reset` + `npm start`)
+npm test           # uji otomatis 61 skenario (jalankan setelah `npm run reset` + `npm start`)
 ```
 
 > Windows (Laragon/XAMPP): cukup Node.js 18+. SQLite tidak butuh server database.
@@ -68,16 +68,22 @@ docker compose up --build
 Hanya port 3000 (gateway) yang dibuka ke host; service nilai & transkrip tidak punya `ports`.
 Hanya gateway yang me-mount **private key**, service hanya mendapat **public key**.
 
-## Frontend uji (tanpa Postman/Thunder Client)
+## Frontend untuk demo (tanpa Postman/Thunder Client)
 
-Setelah `npm start`, buka **http://127.0.0.1:3000/** di browser. Halaman ini disajikan gateway dan
-semua panggilannya tetap melewati PEP (login, refresh, logout, lihat/ubah nilai, finalisasi, transkrip).
+Setelah `npm start`, buka **http://127.0.0.1:3000/**. Seluruh demo bisa dilakukan dari browser:
 
-- Klik chip akun (`admin`, `dosen1`, ...) untuk mengisi username, password, dan Device ID otomatis.
-- Panel kanan menampilkan setiap request/response beserta status dan alasan penolakan.
-- Bagian **Uji penolakan** berisi tombol serangan siap pakai (tanpa token, NIM orang lain, token palsu, dll.).
-- Token hanya disimpan di memori halaman (tidak di localStorage); reload = harus login ulang.
-- File: `public/index.html`. Hanya file statis yang dilayani tanpa token; semua endpoint API tetap default deny.
+- **Pindah akun satu klik**: tombol `admin`, `dosen1`, `mhs1`, ... di header (login otomatis; tiap akun punya sesi sendiri sehingga tidak perlu login ulang).
+- **Token Inspector**: sub, role, sid, algoritma RS256, dan hitung mundur masa berlaku token. Ada tombol Refresh token dan Logout.
+- **Nilai / Transkrip**: dosen mengedit nilai dan memfinalisasi kelas; mahasiswa melihat nilai (draft disembunyikan) dan transkrip.
+- **Skenario uji**: 4 kelompok skenario otomatis (4.1, 4.2, 4.3, finalisasi + antar-service) berisi 30 langkah. Tiap langkah menampilkan status harapan vs hasil (✔/✘) beserta alasan dari server.
+- **Panel admin** (login sebagai `admin`): ubah jam akses, buka kembali finalisasi (agar demo bisa diulang), simulasi serangan langsung ke service, dan lihat audit log (filter allow/deny).
+- Centang **pakai device user lain** untuk menguji penolakan device secara manual.
+- **Log request/response** di panel kanan menampilkan setiap panggilan.
+- Token hanya disimpan di memori halaman (bukan localStorage); reload = login ulang.
+
+**Alat demo di backend** (`src/gateway/demo.js`): endpoint `/demo/*` hanya untuk admin dan tetap melewati PEP
+(token, device, policy, audit log). Endpoint ini bukan bagian Tabel 3. Matikan dengan environment `DEMO_MODE=0`
+(maka endpoint itu ditolak default deny dan Panel admin tidak berfungsi).
 
 ## Data awal (seed)
 
@@ -177,12 +183,12 @@ config/access-hours.json      jam akses (dapat diubah saat demo)
 scripts/setup.js              keypair + skema DB + seed
 scripts/start-all.js          menjalankan 3 komponen sekaligus
 scripts/audit.js              menampilkan audit log
-scripts/test-e2e.js           58 skenario uji otomatis
+scripts/test-e2e.js           61 skenario uji otomatis
 src/shared/                   config, db, verifikasi JWT, guard service
-src/gateway/                  PEP: index, policy (PE), authRoutes (PA), tokens, audit, accessHours
+src/gateway/                  PEP: index, policy (PE), authRoutes (PA), tokens, audit, accessHours, demo (alat demo admin)
 src/nilai/                    Service Nilai
 src/transkrip/                Service Transkrip
-public/index.html             frontend uji (disajikan gateway di /)
+public/index.html             frontend demo (disajikan gateway di /)
 docs/PANDUAN_VIDEO.md         skrip & rundown video demo 6–9 menit
 Dockerfile, docker-compose.yml
 ```

@@ -33,4 +33,11 @@ function isWithinAccessHours() {
   return { ok: now >= toMinutes(c.start) && now < toMinutes(c.end), config: c };
 }
 
-module.exports = { isWithinAccessHours };
+// Dipakai alat demo (admin) untuk mengubah rentang jam; zona waktu dipertahankan
+function save(partial) {
+  const next = { ...readConfig(), ...partial };
+  fs.writeFileSync(cfg.accessHoursFile, JSON.stringify(next, null, 2) + '\n');
+  return next;
+}
+
+module.exports = { isWithinAccessHours, save };

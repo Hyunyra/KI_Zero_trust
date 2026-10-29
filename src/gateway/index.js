@@ -90,6 +90,9 @@ function enforce(req, res, next) {
 }
 app.use(enforce);
 
+// Alat demo (admin saja, sudah lolos PEP di atas). Matikan dengan DEMO_MODE=0.
+if (process.env.DEMO_MODE !== '0') app.use('/demo', express.json({ limit: '10kb' }), require('./demo'));
+
 // --- Meneruskan request yang sudah diizinkan, dengan X-Gateway-Secret ---
 const forward = (target, pathFilter) =>
   createProxyMiddleware({

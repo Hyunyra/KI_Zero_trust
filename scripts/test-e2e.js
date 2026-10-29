@@ -195,6 +195,14 @@ async function login(user, password = 'password123', device = DEV[user]) {
   r = await gw('GET', '/nilai', { token: newAccess, device: DEV.mhs1 });
   check('access token sesi yang di-logout langsung ditolak -> 401', r.status === 401, JSON.stringify(r));
 
+  section('10b. Alat demo (hanya admin)');
+  r = await gw('GET', '/demo/audit?limit=5', { token: tok.admin, device: DEV.admin });
+  check('admin membaca audit log lewat gateway', r.status === 200 && r.json.data.length > 0);
+  r = await gw('GET', '/demo/audit', { token: tok.dosen1, device: DEV.dosen1 });
+  check('dosen membaca audit log -> 403', r.status === 403);
+  r = await gw('POST', '/demo/serangan-langsung', { token: tok.admin, device: DEV.admin });
+  check('serangan langsung ke service: 403, 401, 401', r.status === 200 && r.json.hasil.map((x) => x.status).join() === '403,401,401', JSON.stringify(r.json));
+
   section('11. Audit log (4.4)');
   const total = db.prepare('SELECT COUNT(*) c FROM audit_log').get().c;
   const dn = db.prepare("SELECT COUNT(*) c FROM audit_log WHERE result='deny'").get().c;

@@ -87,6 +87,16 @@ const rules = [
   },
 ];
 
+// ---------- Alat demo: hanya admin, nonaktif jika DEMO_MODE=0 (lihat demo.js) ----------
+if (process.env.DEMO_MODE !== '0') {
+  const adminOnly = ({ subject }) =>
+    hasRole(subject, 'admin') ? allow('admin memakai alat demo') : deny('alat demo hanya untuk admin');
+  for (const [method, re] of [
+    ['GET', /^\/demo\/audit\/?$/], ['GET', /^\/demo\/jam-akses\/?$/], ['PUT', /^\/demo\/jam-akses\/?$/],
+    ['POST', /^\/demo\/buka-finalisasi\/?$/], ['POST', /^\/demo\/serangan-langsung\/?$/],
+  ]) rules.push({ method, re, check: adminOnly });
+}
+
 // subject: { type:'user'|'service', id, role }
 function decide({ subject, method, path, query }) {
   const rule = rules.find((r) => r.method === method && r.re.test(path));
